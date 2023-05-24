@@ -83,12 +83,14 @@ class Zoom_Main_Window:
 
         if not self.validate_entry(self.__username, self.__meeting_id, self.__meeting_password):
             if self.check_db(self.__meeting_id, self.__meeting_password):
+                self.root.destroy()
                 threading.Thread(target=ZoomClient, args=(self.__username, self.__meeting_id)).start()
             else:
                 self.create_top_level("try again!")
+                return
         else:
             self.create_top_level("One or more fields are empty, try again!")
-            return
+        return
 
     def handle_new_host_client(self):
         self.__username = self.entry1.get()
@@ -97,12 +99,13 @@ class Zoom_Main_Window:
 
         if not self.validate_entry(self.__username, self.__meeting_id, self.__meeting_password):
             if self.insert_db(self.__meeting_id, self.__meeting_password):
+                self.root.destroy()
                 threading.Thread(target=HostZoomClient, args=(self.__username, self.__meeting_id)).start()
             else:
                 self.create_top_level("Error")
         else:
             self.create_top_level("One or more fields are empty, try again!")
-            return
+        return
 
     def validate_entry(self, *args):
         for arg in args:
