@@ -1,5 +1,6 @@
 import socket
 import sqlite3
+import threading
 from sqlite3 import Error
 
 
@@ -21,23 +22,40 @@ class Database_Server:
         response = None
         try:
             request_clear = request.split(";")
+            print(request_clear)
             db_connection, db_cursor = self.build_connection_to_db()
             db_cursor.execute(request_clear[0])
-            if request_clear[0].lower() == "select":
+            print("outside the if statements")
+            if request_clear[0].lower().startswith("select"):
                 result = db_cursor.fetchall()
                 stored_password = result[0]
+                print(stored_password)
                 if stored_password == request_clear[1]:
                     response = f"Authentication successful"
-            else:
+                else:
+                    response = "Exception"
+            elif request_clear[0].lower().startswith("insert"):
                 try:
+                    print("hi")
                     db_connection.commit()
                     response = "Authentication successful"
                 except:
-                    response = "Exception"
+                    response = "Exception1"
         except:
-            response = "Exception"
+            response = "Exception2"
         print(response)
         client_socket.sendall(response.encode())
+        return
+
+    def handle_client(self, client_socket):
+        request = None
+        while True:
+            request = client_socket.recv(1024).decode()
+            if not request:
+                break
+            print("Received request:", request)
+
+            self.handle_request(client_socket, request)
 
     def start_server(self):
         self.build_data_base()
@@ -51,12 +69,9 @@ class Database_Server:
             client_socket, client_address = server_socket.accept()
             print("Client connected:", client_address)
 
-            request = client_socket.recv(1024).decode()
-            print("Received request:", request)
+            threading.Thread(target=self.handle_client, args=(client_socket,)).start()
 
-            self.handle_request(client_socket, request)
-
-            client_socket.close()
+            # client_socket.close()
 
     def build_data_base(self):
         db_connection, db_cursor = self.build_connection_to_db()
