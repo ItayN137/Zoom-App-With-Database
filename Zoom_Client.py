@@ -93,8 +93,8 @@ class ZoomClient:
         self.root.geometry(f"{self._WIDTH}x{self._HEIGHT}")
         self.root.title("Itay's Zoom Application")
 
-        # self.app_image = tkinter.PhotoImage(file="zoom.png")
-        # self.root.iconphoto(False, self.app_image)
+        self.app_image = tkinter.PhotoImage(file="zoom.png")
+        self.root.iconphoto(False, self.app_image)
 
         self.label = customtkinter.CTkLabel(master=self.root, text="Itay's Zoom Application",
                                             font=("Arial", 25))
@@ -250,9 +250,9 @@ class ZoomClient:
 class HostZoomClient(ZoomClient):
 
     def __init__(self, name, kick_adminstartion):
-        tryserver.AudioServer().start()
-        tryserver.ScreenStreamingServer().start()
-        tryserver.CameraStreamingServer().start()
+        threading.Thread(target=tryserver.AudioServer().start).start()
+        threading.Thread(target=tryserver.ScreenStreamingServer().start).start()
+        threading.Thread(target=tryserver.CameraStreamingServer().start).start()
         super().__init__(name, kick_adminstartion)
 
 
