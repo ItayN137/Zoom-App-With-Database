@@ -75,7 +75,7 @@ class StreamingClient(Client):
 
 
         while True:
-            print(f"Status: {self.__stream_on} on port: {self.port}")
+            print(f"Status: {self.__stream_on} on : {self.server_address}")
             if self.__stream_on:
                 # Take a screenshot of the monitor or the camera
                 screenshot = self.get_frame()
@@ -198,11 +198,10 @@ class CameraClient(StreamingClient):
         self.__y_res = y_res
         self.__camera = cv2.VideoCapture(0)
         self.__configure()
-        self.font = ImageFont.truetype("arial.ttf", 8)  # Specify the desired font file
+        self.font = ImageFont.truetype("arial.ttf", 15)  # Specify the desired font file
         self.overlay_size = self.font.getsize(self.name)
-        self.overlay_size = tuple(value + 10 for value in self.overlay_size)
+        self.overlay_size = tuple(value + 6 for value in self.overlay_size)
         self.overlay = Image.new('RGBA', self.overlay_size, self.overlay_color)
-
 
     def __configure(self):
         self.__camera.set(3, self.__x_res)
@@ -213,7 +212,7 @@ class CameraClient(StreamingClient):
         ret, frame = self.__camera.read()
 
         # Convert screenshot to PIL image
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        rgb_frame = frame[:, :, ::-1]
         pil_image = Image.fromarray(rgb_frame)
 
         # Resizing the photo
@@ -309,7 +308,7 @@ class MicrophoneAudioClient(AudioClient):
 
 
 def main():
-    c = ScreenShareClient(socket.gethostname())
+    c = CameraClient("Itay", socket.gethostname())
 
     root = customtkinter.CTk()
     window = Window(root)
