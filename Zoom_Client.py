@@ -141,9 +141,9 @@ class ZoomClient:
 
         threading.Thread(target=self.audio_client.start).start()
 
-        self.camera_display_label.after(0, self.camera_client.start, self.camera_display_label)
-
         self.screen_display_label.after(0, self.screen_share_client.start, self.screen_display_label)
+
+        self.camera_display_label.after(0, self.camera_client.start, self.camera_display_label)
 
         self.root.protocol("WM_DELETE_WINDOW", self.confirm_close)
         self.root.mainloop()
@@ -249,11 +249,11 @@ class ZoomClient:
 
 class HostZoomClient(ZoomClient):
 
-    def __init__(self, name, kick_adminstartion):
+    def __init__(self, name, ip):
         threading.Thread(target=tryserver.AudioServer().start).start()
         threading.Thread(target=tryserver.ScreenStreamingServer().start).start()
         threading.Thread(target=tryserver.CameraStreamingServer().start).start()
-        super().__init__(name, kick_adminstartion)
+        super().__init__(name, ip)
 
 
 def main():
