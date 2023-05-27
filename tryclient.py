@@ -73,9 +73,12 @@ class StreamingClient(Client):
         bio = io.BytesIO()
         image_quality = 10
 
+        # Send start message (or private key)
+        self.send_message("Hi".encode())
+
 
         while True:
-            print(f"Status: {self.__stream_on} on : {self.server_address}")
+            print(f"{self.__stream_on}:{self.server_address}")
             if self.__stream_on:
                 # Take a screenshot of the monitor or the camera
                 screenshot = self.get_frame()
@@ -270,7 +273,7 @@ class AudioClient(Client):
     def send_data(self):
         # Loop forever and send audio data to the server
         while True:
-            print(f"Audio: {self.__muted}")
+            print(f"{self.__muted}: {self.port}")
             if not self.__muted:
                 # Read a chunk of audio data from the microphone
                 data = self.get_audio_data()
