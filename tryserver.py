@@ -8,27 +8,33 @@ import pyaudio
 import concurrent.futures
 
 
-class CameraStreamingServer:
+class StreamingServer:
 
-    def __init__(self):
+    def __init__(self, port):
         # Create a socket object
         self.server_socket = None
         self.server_address = None
         self.__clients_screenshots = {}
+        self.__clients = []
         self.__clients_amount = 0
-        self.__max_clients = 4
-        self.big_screenshot = Image.new("RGB", (1200, 200), color='black')
-        self.reset_screenshot = Image.new("RGB", (300, 200), color='black')
-        self.cords = [(0, 0), (300, 0), (600, 0), (900, 0)]
+        self.__max_clients = 0
+        self.big_screenshot = None
+        self.reset_screenshot = None
+        self.cords = None
+
 
         # Bind the socket to a specific host and port
         self.host = socket.gethostname()
-        self.port = 12344
+        self.port = port
         self.server_address = (self.host, self.port)
+
+        self.open_udp_server()
+
 
     def open_udp_server(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_socket.bind(self.server_address)
+        print(self.server_address)
 
     def update_big_screenshot(self, client_address, screenshot):
         try:
@@ -37,8 +43,9 @@ class CameraStreamingServer:
             return self.big_screenshot
 
     def broadcast(self, data):
-        for client_address in self.__clients_screenshots.keys():
+        for client_address in self.__clients:
             self.server_socket.sendto(data, client_address)
+            print("lolololololll")
 
     def handle_data(self, s):
         """Function to handle the data from client connection and send it back"""
@@ -53,21 +60,29 @@ class CameraStreamingServer:
             except:
                 continue
 
+            if data == b'Hi':
+                self.__clients.append(client_address)
+                print("wdwdwdwdwdwdwdwdwdwdwdwdwd")
+                continue
+
             if self.__clients_amount >= self.__max_clients:
                 self.server_socket.sendto(str(len("max capacity")).encode(), client_address)
                 self.server_socket.sendto("max capacity".encode(), client_address)
                 # keep the server going and closing only the 5th client
 
-            if client_address not in self.__clients_screenshots:
+            if client_address not in self.__clients_screenshots and (not data == b'Hi'):
                 x_cords, y_cords = self.cords[self.__clients_amount]
                 self.__clients_screenshots[client_address] = (x_cords, y_cords)
                 self.__clients_amount += 1
+                print("ezezezezezezezez")
 
             if data == b'Q':
                 new_screen = self.update_big_screenshot(client_address, self.reset_screenshot)
                 print(self.__clients_screenshots[client_address])
                 del self.__clients_screenshots[client_address]
                 self.__clients_amount -= 1
+
+
 
             else:
                 # Open the screenshot with BytesIO
@@ -96,23 +111,28 @@ class CameraStreamingServer:
                 image_quality -= 10
 
     def start(self):
-        # Open to udp server
-        self.open_udp_server()
         t = threading.Thread(target=self.handle_data, args=(self.server_socket,))
         t.start()
-        return
 
 
-class ScreenStreamingServer(CameraStreamingServer):
-    
+class ScreenStreamingServer(StreamingServer):
+
     def __init__(self):
-        super(ScreenStreamingServer, self).__init__()
+        super(ScreenStreamingServer, self).__init__(12343)
         self.cords = [(0, 0)]
         self.__max_clients = 1
         self.big_screenshot = Image.new("RGB", (1200, 600), color='black')
         self.reset_screenshot = Image.new("RGB", (1200, 600), color='black')
-        self.port = 12343
-        self.server_address = (self.host, self.port)
+
+
+class CameraStreamingServer(StreamingServer):
+
+    def __init__(self):
+        super(CameraStreamingServer, self).__init__(12344)
+        self.cords = [(0, 0), (300, 0), (600, 0), (900, 0)]
+        self.__max_clients = 4
+        self.big_screenshot = Image.new("RGB", (1200, 200), color='black')
+        self.reset_screenshot = Image.new("RGB", (300, 200), color='black')
 
 
 class AudioServer:
@@ -132,7 +152,7 @@ class AudioServer:
         self.host = socket.gethostname()
         self.port = 12345
         self.server_address = (self.host, self.port)
-
+        print(self.server_address)
         # Open to udp server
         self.open_udp_server()
 
@@ -164,12 +184,11 @@ class AudioServer:
     def start(self):
         t = threading.Thread(target=self.handle_data)
         t.start()
-        return
 
 
 def main():
-    # s = CameraStreamingServer()
-    # s.start()
+    s = CameraStreamingServer()
+    s.start()
     # s1 = AudioServer()
     # s1.start()
     s2 = ScreenStreamingServer()
