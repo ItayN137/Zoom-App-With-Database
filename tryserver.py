@@ -47,7 +47,7 @@ class StreamingServer:
             self.server_socket.sendto(data, client_address)
             print("lolololololll")
 
-    def handle_data(self, s):
+    def handle_data(self):
         """Function to handle the data from client connection and send it back"""
 
         bio = io.BytesIO()
@@ -56,13 +56,13 @@ class StreamingServer:
         while True:
             try:
                 # Receive the data from the client
-                data, client_address = s.recvfrom(65000)
+                data, client_address = self.server_socket.recvfrom(65000)
             except:
                 continue
 
             if data == b'Hi':
                 self.__clients.append(client_address)
-                print("wdwdwdwdwdwdwdwdwdwdwdwdwd")
+                #print("wdwdwdwdwdwdwdwdwdwdwdwdwd")
                 continue
 
             if self.__clients_amount >= self.__max_clients:
@@ -74,7 +74,7 @@ class StreamingServer:
                 x_cords, y_cords = self.cords[self.__clients_amount]
                 self.__clients_screenshots[client_address] = (x_cords, y_cords)
                 self.__clients_amount += 1
-                print("ezezezezezezezez")
+                #print("ezezezezezezezez")
 
             if data == b'Q':
                 new_screen = self.update_big_screenshot(client_address, self.reset_screenshot)
@@ -111,7 +111,7 @@ class StreamingServer:
                 image_quality -= 10
 
     def start(self):
-        t = threading.Thread(target=self.handle_data, args=(self.server_socket,))
+        t = threading.Thread(target=self.handle_data)
         t.start()
 
 
@@ -180,10 +180,6 @@ class AudioServer:
 
             # Send the data back to Clients
             self.broadcast(data)
-
-    def start(self):
-        t = threading.Thread(target=self.handle_data)
-        t.start()
 
 
 def main():
