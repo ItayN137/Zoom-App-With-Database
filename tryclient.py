@@ -78,7 +78,7 @@ class StreamingClient(Client):
 
 
         while True:
-            print(f"{self.__stream_on}:{self.server_address}")
+            print(f"{self.__stream_on}:{self.port}")
             if self.__stream_on:
                 # Take a screenshot of the monitor or the camera
                 screenshot = self.get_frame()
@@ -140,10 +140,9 @@ class StreamingClient(Client):
 
         # Send screenshots to the server
         threading.Thread(target=self.send_screenshot).start()
-
         time.sleep(1 / 3)
-
         threading.Thread(target=self.receive_screenshot).start()
+        return
 
     def start_stream(self):
         self.__stream_on = True
@@ -161,7 +160,6 @@ class StreamingClient(Client):
         self.send_message("Q".encode())
         self.__stream_on = False
         self.server_socket.close()
-        self.window.destroy()
         sys.exit()
 
 
@@ -283,10 +281,9 @@ class AudioClient(Client):
 
     def start(self):
         threading.Thread(target=self.send_data).start()
-
         time.sleep(1 / 3)
-
         threading.Thread(target=self.recv_data).start()
+        return
 
     def start_mic(self):
         self.__muted = False
