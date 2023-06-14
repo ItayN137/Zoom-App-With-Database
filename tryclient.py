@@ -2,20 +2,13 @@ import socket
 import sys
 import threading
 from io import BytesIO
-import tkinter as tk
-
-import customtkinter
-import customtkinter as Ctk
 import cv2
 import pyaudio
 from PIL import ImageGrab, Image, ImageTk, JpegImagePlugin, ImageDraw, ImageFont
 import io
 import time
 from pynput.mouse import Controller
-from Window import Window
 from abc import ABC
-import soundcard as sc
-from tkinter.messagebox import askyesno
 
 
 class Client(ABC):
@@ -26,11 +19,10 @@ class Client(ABC):
         self.server_address = None
         self.name = name
 
-        self.__running = False
-
     def connect_udp_socket(self):
         # Open a socket
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return
 
     def send_message(self, data):
         """Gets encoded data to send"""
@@ -78,7 +70,7 @@ class StreamingClient(Client):
 
 
         while True:
-            print(f"{self.__stream_on}:{self.port}")
+            print(f"")
             if self.__stream_on:
                 # Take a screenshot of the monitor or the camera
                 screenshot = self.get_frame()
@@ -271,7 +263,7 @@ class AudioClient(Client):
     def send_data(self):
         # Loop forever and send audio data to the server
         while True:
-            print(f"{self.__muted}: {self.port}")
+            print(f"")
             if not self.__muted:
                 # Read a chunk of audio data from the microphone
                 data = self.get_audio_data()
@@ -307,22 +299,44 @@ class MicrophoneAudioClient(AudioClient):
         return self.stream.read(self._chunk)
 
 
-def main():
-    c = CameraClient("Itay", socket.gethostname())
+class ChatWindow:
+    def __init__(self, client_name, address, input_area, text_area):
+        self._CLIENT_NAME = client_name
+        self.input_area = input_area
+        self.text_area = text_area
+        self._IP = address
+        self._PORT = 12341
+        self.server_address = (self._IP, self._PORT)
+        self.sock = None
+        self.running = True
 
-    root = customtkinter.CTk()
-    window = Window(root)
-    root = window.create_tk_window()
-    label = window.create_label(master=root)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect(self.server_address)
 
-    label.after(0, c.start, label)
+    def send_data(self, data):
+        self.sock.send(data.encode('utf-8'))
+        return
 
-    root.mainloop()
+    def start(self):
+        threading.Thread(target=self.handle_receive).start()
+        return
 
-    # c = MicrophoneAudioClient()
-    # c.start()
-    # c.start_mic()
+    def handle_receive(self):
+        while self.running:
+            try:
+                message = self.sock.recv(1024).decode('utf-8')
+                print(message)
+                if message == 'NICKNAME':
+                    self.sock.send(self._CLIENT_NAME.encode('utf-8'))
+                else:
+                    self.text_area.config(state="normal")
+                    self.text_area.insert('end', message)
+                    self.text_area.yview('end')
+                    self.text_area.config(state='disabled')
 
-
-if __name__ == '__main__':
-    main()
+            except ConnectionAbortedError:
+                break
+            except:
+                print("Error")
+                self.sock.close()
+                break
