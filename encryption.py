@@ -1,6 +1,5 @@
 import rsa
 from Crypto.Random import get_random_bytes
-from Crypto.Protocol.KDF import PBKDF2
 import hashlib
 from Crypto.Cipher import AES
 from  Crypto.Util.Padding import pad, unpad
@@ -14,7 +13,7 @@ def generate_rsa_keys(client_socket):
     with open("private.pem", "wb") as f:
         f.write(private_key.save_pkcs1("PEM"))
 
-    client_socket.send(public_key)
+    #client_socket.send(public_key)
     return public_key, private_key
 
 
@@ -27,26 +26,42 @@ def decrypt_rsa(data, private_key):
     return dectypted_data.decode()
 
 
-def create_AES_key():
-    salt = get_random_bytes(32)
-    password = "ldolwDDw129d"
+def create_AES_key_iv():
+    key = get_random_bytes(16)
+    iv = get_random_bytes(16)
 
-    key = PBKDF2(password, salt, dkLen=32)
-
-    cipher = AES.new(key, AES.MODE_CBC)
-    return cipher
+    return key, iv
 
 
-def encrypt_AES(data, cipher):
-    ciphered_data = cipher.encrypt(pad(data, AES.block_size))
+def generate_cipher(key, iv):
+    return AES.new(key, AES.MODE_CBC, iv)
 
 
-def decrypt_AES(data, cipher):
-    decrypted_data = unpad(cipher.dectypt(data), AES.block_size)
+def encrypt_AES(plaintext, cipher):
+    return cipher.encrypt(pad(plaintext, AES.block_size))
+
+
+def decrypt_AES(ciphertext, key, iv):
+    cipher = generate_cipher(key, iv)
+    plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+    return plaintext
 
 
 def encrypt_MD5(data):
     return hashlib.md5(data).hexdigest()
+
+
+message = b"hi my name is itay"
+print(message)
+print(len(message))
+
+
+aes_key, aes_iv = create_AES_key_iv()
+aes_cipher = generate_cipher(aes_key, aes_iv)
+aes_e = encrypt_AES(message, aes_cipher)
+print(aes_e)
+aes_d = decrypt_AES(aes_e, aes_key, aes_iv)
+print(aes_d.decode())
 
 
 
