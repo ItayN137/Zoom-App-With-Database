@@ -1,44 +1,47 @@
 from tkinter.messagebox import askyesno
-
+import tkinter.scrolledtext
 import customtkinter
 import tkinter
-from PIL import Image, ImageTk
-import multiprocessing
+from PIL import Image
 import socket
 import sys
 import threading
-import time
-import multiprocessing
 import tryclient
 import tryserver
+from customtkinter import CTkScrollbar
 
 
 class ZoomClient:
 
     def __init__(self, username, ip_address):
         self._USERNAME = username
+        self._IP = ip_address
         self._IS_MUTED = True
         self._IS_CAMERA = False
         self._IS_SCREEN_SHARING = False
-        self._CHAT_OPEN = False
-        self._PARTICIPANTS_OPEN = False
-        self._SETTINGS = False
-        self._WIDTH = 1280
+        self._WIDTH = 1500
         self._HEIGHT = 920
         self.root = None
         self.lower_frame = None
         self.upper_frame = None
         self.label = None
-        self.top_level = None
         self.app_image = None
         self.microphone_button = None
         self.camera_button = None
         self.share_screen_button = None
-        self.chat_button = None
-        self.participants_button = None
-        self.settings_button = None
         self.window = None
-        self.top_level_label = None
+        self.camera_display_label = None
+        self.screen_display_label = None
+        self.text_area = None
+        self.input_area = None
+        self.chat_label = None
+        self.send_button = None
+        self.appearance_mode_option_menu = None
+        self.emoji1 = None
+        self.emoji2 = None
+        self.emoji3 = None
+        self.emoji4 = None
+        self.emoji5 = None
         self.muted_mic_image = customtkinter.CTkImage(light_image=Image.open("mute_microphone.png"),
                                                       dark_image=Image.open("mute_microphone.png"),
                                                       size=(20, 20))
@@ -63,17 +66,6 @@ class ZoomClient:
                                                              dark_image=Image.open("screen_share_off.png"),
                                                              size=(20, 20))
 
-        self.chat_photo = customtkinter.CTkImage(light_image=Image.open("chat.png"),
-                                                 dark_image=Image.open("chat.png"),
-                                                 size=(20, 20))
-
-        self.participants_photo = customtkinter.CTkImage(light_image=Image.open("group.png"),
-                                                         dark_image=Image.open("group.png"),
-                                                         size=(20, 20))
-        self.settings_photo = customtkinter.CTkImage(light_image=Image.open("settings.png"),
-                                                     dark_image=Image.open("settings.png"),
-                                                     size=(20, 20))
-
         self.screen_default_photo = customtkinter.CTkImage(light_image=Image.open("black_screen.png"),
                                                            dark_image=Image.open("black_screen.png"),
                                                            size=(1200, 600))
@@ -81,30 +73,80 @@ class ZoomClient:
         self.camera_default_photo = customtkinter.CTkImage(light_image=Image.open("black_screen.png"),
                                                            dark_image=Image.open("black_screen.png"),
                                                            size=(1200, 200))
+        self.send_photo = customtkinter.CTkImage(light_image=Image.open("send.png"),
+                                                 dark_image=Image.open("send.png"),
+                                                 size=(20, 20))
 
         self.audio_client = tryclient.MicrophoneAudioClient(ip_address)
         self.screen_share_client = tryclient.ScreenShareClient(self._USERNAME, ip_address)
         self.camera_client = tryclient.CameraClient(self._USERNAME, ip_address)
+        self.chat_client = None
 
         threading.Thread(target=self.handle_new_client).start()
 
     def handle_new_client(self):
         self.root = customtkinter.CTk()
         self.root.geometry(f"{self._WIDTH}x{self._HEIGHT}")
-        self.root.title("Itay's Zoom Application")
+        self.root.title("PyMeetings")
 
         self.app_image = tkinter.PhotoImage(file="zoom.png")
         self.root.iconphoto(False, self.app_image)
 
-        self.label = customtkinter.CTkLabel(master=self.root, text="Itay's Zoom Application",
-                                            font=("Arial", 25))
+        self.label = customtkinter.CTkLabel(master=self.root, text="PyMeetings",
+                                            font=("Arial", 30))
         self.label.pack(pady=6, padx=5)
 
         self.camera_display_label = customtkinter.CTkLabel(master=self.root, image=self.camera_default_photo, text="")
-        self.camera_display_label.place(relx=0.5, rely=0.16, anchor=tkinter.CENTER)
+        self.camera_display_label.place(relx=0.41, rely=0.16, anchor=tkinter.CENTER)
 
         self.screen_display_label = customtkinter.CTkLabel(master=self.root, image=self.screen_default_photo, text="")
-        self.screen_display_label.place(relx=0.5, rely=0.6, anchor=tkinter.CENTER)
+        self.screen_display_label.place(relx=0.41, rely=0.6, anchor=tkinter.CENTER)
+
+        self.text_area = tkinter.scrolledtext.ScrolledText(self.root, width=25, height=35, bg='grey')
+        self.text_area.place(relx=0.9, rely=0.5, anchor=tkinter.CENTER)
+        self.text_area.config(state='disabled')
+
+        self.input_area = tkinter.Text(self.root, width=25, height=3)
+        self.input_area.place(relx=0.9, rely=0.85, anchor=tkinter.CENTER)
+
+        self.chat_label = customtkinter.CTkLabel(master=self.root, text="Chat",
+                                            font=("Arial", 50))
+        self.chat_label.place(relx=0.9, rely=0.15, anchor=tkinter.CENTER)
+
+        self.appearance_mode_option_menu = customtkinter.CTkOptionMenu(self.root,
+                                                                       values=["Light", "Dark"],
+                                                                       command=self.change_appearance_mode_event)
+        self.appearance_mode_option_menu.place(relx=0.9, rely=0.05, anchor=tkinter.CENTER)
+
+        self.emoji1 = customtkinter.CTkButton(master=self.root,
+                                              text="👋",
+                                              font=("Ariel", 15, "bold"), width=10, height=10,
+                                              command=lambda: self.handle_emoji("👋"))
+        self.emoji1.place(relx=0.84, rely=0.9, anchor=tkinter.CENTER)
+
+        self.emoji2 = customtkinter.CTkButton(master=self.root,
+                                              text="🎤",
+                                              font=("Ariel", 15, "bold"), width=10, height=10,
+                                              command=lambda: self.handle_emoji("🎤"))
+        self.emoji2.place(relx=0.87, rely=0.9, anchor=tkinter.CENTER)
+
+        self.emoji3 = customtkinter.CTkButton(master=self.root,
+                                              text="📷",
+                                              font=("Ariel", 15, "bold"), width=10, height=10,
+                                              command=lambda: self.handle_emoji("📷"))
+        self.emoji3.place(relx=0.9, rely=0.9, anchor=tkinter.CENTER)
+
+        self.emoji4 = customtkinter.CTkButton(master=self.root,
+                                              text="💻",
+                                              font=("Ariel", 15, "bold"), width=10, height=10,
+                                              command=lambda: self.handle_emoji("💻"))
+        self.emoji4.place(relx=0.93, rely=0.9, anchor=tkinter.CENTER)
+
+        self.emoji5 = customtkinter.CTkButton(master=self.root,
+                                              text="💡",
+                                              font=("Ariel", 15, "bold"), width=10, height=10,
+                                              command=lambda: self.handle_emoji("💡"))
+        self.emoji5.place(relx=0.96, rely=0.9, anchor=tkinter.CENTER)
 
         self.lower_frame = customtkinter.CTkFrame(master=self.root, width=400, height=50)
         self.lower_frame.pack(ipadx=400, ipady=4, side="bottom")
@@ -127,18 +169,15 @@ class ZoomClient:
                                                            command=self.handle_share_screen)
         self.share_screen_button.pack(pady=10, padx=10, side="left", anchor=tkinter.CENTER)
 
-        self.chat_button = customtkinter.CTkButton(master=self.lower_frame, image=self.chat_photo,
-                                                   text="Chat",
+        self.send_button = customtkinter.CTkButton(master=self.lower_frame, image=self.send_photo,
+                                                   text="Send",
                                                    font=("Ariel", 15, "bold"), width=10, height=10,
-                                                   command=self.handle_chat())
-        self.chat_button.pack(pady=10, padx=10, side="right", anchor=tkinter.CENTER)
+                                                   command=self.handle_send)
+        self.send_button.pack(pady=10, padx=10, side="right", anchor=tkinter.CENTER)
 
-        self.participants_button = customtkinter.CTkButton(master=self.lower_frame, image=self.participants_photo,
-                                                           text="Participants",
-                                                           font=("Ariel", 15, "bold"), width=10, height=10,
-                                                           command=self.handle_participants())
-        self.participants_button.pack(pady=10, padx=10, side="right", anchor=tkinter.CENTER)
+        self.chat_client = tryclient.ChatWindow(self._USERNAME, self._IP, self.input_area, self.text_area)
 
+        self.chat_client.start()
         self.audio_client.start()
         self.screen_share_client.start(self.screen_display_label)
         self.camera_client.start(self.camera_display_label)
@@ -155,6 +194,19 @@ class ZoomClient:
             self.camera_client.confirm_close()
             self.camera_client.exit_window()
             sys.exit()
+
+    def change_appearance_mode_event(self, mode):
+        customtkinter.set_appearance_mode(mode)
+        return
+
+    def handle_emoji(self, emoji):
+        if self.input_area.get('1.0', 'end-1c') == "":
+            data = f"{self._USERNAME}: {emoji}\n"
+            self.input_area.delete('1.0', 'end')
+            self.chat_client.send_data(data)
+        else:
+            self.input_area.insert('end', emoji)
+        return
 
     def handle_mic(self):
         """
@@ -218,31 +270,12 @@ class ZoomClient:
             self.screen_share_client.stop_stream()
         return
 
-    def handle_chat(self):
-        """
-        handle the press of the button. opening and closing the chat window
-        :return:
-        """
-        if not self._CHAT_OPEN:
-            self._CHAT_OPEN = True
-            # open the chat window
-        else:
-            self._CHAT_OPEN = False
-            # close the chat window
-        return
-
-    def handle_participants(self):
-        """
-        handle the press of the button. opening and closing the participants window
-        :return:
-        """
-        if not self._PARTICIPANTS_OPEN:
-            self._PARTICIPANTS_OPEN = True
-            # open the participants window
-        else:
-            self._PARTICIPANTS_OPEN = False
-            # close the participants window
-        return
+    def handle_send(self):
+        data = None
+        if not self.input_area.get('1.0', 'end-1c') == "":
+            data = f"{self._USERNAME}: {self.input_area.get('1.0', 'end')}"
+            self.input_area.delete('1.0', 'end')
+        self.chat_client.send_data(data)
 
 
 class HostZoomClient(ZoomClient):
@@ -251,6 +284,8 @@ class HostZoomClient(ZoomClient):
         threading.Thread(target=tryserver.AudioServer().handle_data).start()
         threading.Thread(target=tryserver.ScreenStreamingServer().handle_data).start()
         threading.Thread(target=tryserver.CameraStreamingServer().handle_data).start()
+        threading.Thread(target=tryserver.ZoomHostChatWindow().handle_receive).start()
+
         super().__init__(name, ip)
 
 
