@@ -1,11 +1,8 @@
 import socket
 import threading
-
 from PIL import Image
 from io import BytesIO
 import io
-import pyaudio
-import concurrent.futures
 
 
 class StreamingServer:
@@ -22,14 +19,12 @@ class StreamingServer:
         self.reset_screenshot = None
         self.cords = None
 
-
         # Bind the socket to a specific host and port
         self.host = socket.gethostname()
         self.port = port
         self.server_address = (self.host, self.port)
 
         self.open_udp_server()
-
 
     def open_udp_server(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -74,6 +69,8 @@ class StreamingServer:
                 x_cords, y_cords = self.cords[self.__clients_amount]
                 self.__clients_screenshots[client_address] = (x_cords, y_cords)
                 self.__clients_amount += 1
+                if client_address not in self.__clients:
+                    self.__clients.append(client_address)
                 #print("ezezezezezezezez")
 
             if data == b'Q':
@@ -81,6 +78,7 @@ class StreamingServer:
                 print(self.__clients_screenshots[client_address])
                 del self.__clients_screenshots[client_address]
                 self.__clients_amount -= 1
+                self.__clients.remove(client_address)
 
 
 
@@ -138,11 +136,6 @@ class CameraStreamingServer(StreamingServer):
 class AudioServer:
 
     def __init__(self):
-        self.__chunk = 1024
-        self.__format = pyaudio.paInt16
-        self.__channels = 1
-        self.__rate = 44100
-
         # None objects
         self.server_socket = None
         self.__clients_addresses = []
@@ -156,8 +149,10 @@ class AudioServer:
         # Open to udp server
         self.open_udp_server()
 
-    def broadcast(self, data):
+    def broadcast(self, data, address):
         for client_address in self.__clients_addresses:
+            if client_address == address:
+                continue
             self.server_socket.sendto(data, client_address)
 
     def open_udp_server(self):
@@ -179,17 +174,54 @@ class AudioServer:
                 self.__clients_addresses.append(address)
 
             # Send the data back to Clients
-            self.broadcast(data)
+            self.broadcast(data, address)
 
 
-def main():
-    s = CameraStreamingServer()
-    s.start()
-    # s1 = AudioServer()
-    # s1.start()
-    s2 = ScreenStreamingServer()
-    s2.start()
+class ZoomHostChatWindow:
+    def __init__(self):
+        self.host = socket.gethostname()
+        self.port = 12341
+        self.server_address = (self.host, self.port)
+        self.clients = []
+        self.nicknames = []
+        self.sock = None
 
+    def handle_receive(self):
 
-if __name__ == '__main__':
-    main()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.bind(self.server_address)
+
+        self.sock.listen(4)
+        print(self.server_address)
+        while True:
+            client, address = self.sock.accept()
+            #print(f"Connected with {str(adress)}!")
+
+            client.send("NICKNAME".encode('utf-8'))
+            nickname = client.recv(1024).decode()
+
+            self.nicknames.append(nickname)
+            self.clients.append(client)
+
+            print(f"Name of client:{nickname}")
+            self.broadcast(f"{nickname} connected to server!\n".encode('utf-8'))
+
+            thread = threading.Thread(target=self.handle_message, args=(client,))
+            thread.start()
+
+    def broadcast(self, message):
+        for client in self.clients:
+            client.send(message)
+
+    # handle
+    def handle_message(self, client):
+        while True:
+            try:
+                message = client.recv(1024)
+                self.broadcast(message)
+            except:
+                index = self.clients.index(client)
+                self.clients.remove(client)
+                client.close()
+                self.nicknames.remove(self.nicknames[index])
+                break
