@@ -1,8 +1,10 @@
+import pickle
 import socket
 import threading
 from PIL import Image
 from io import BytesIO
 import io
+import encryption
 
 
 class StreamingServer:
@@ -12,12 +14,15 @@ class StreamingServer:
         self.server_socket = None
         self.server_address = None
         self.__clients_screenshots = {}
+        self.__clients_ciphers = {}
         self.__clients = []
         self.__clients_amount = 0
         self.__max_clients = 0
         self.big_screenshot = None
         self.reset_screenshot = None
         self.cords = None
+        self.rsa_public_key = None
+        self.rsa_private_key = None
 
         # Bind the socket to a specific host and port
         self.host = socket.gethostname()
@@ -39,12 +44,16 @@ class StreamingServer:
 
     def broadcast(self, data):
         for client_address in self.__clients:
-            self.server_socket.sendto(data, client_address)
+            message = encryption.encrypt_AES(data, self.__clients_ciphers[client_address])
+            print(f'server {self.port} sent: {message}')
+            self.server_socket.sendto(message, client_address)
             print("lolololololll")
 
     def handle_data(self):
         """Function to handle the data from client connection and send it back"""
 
+        self.rsa_public_key, self.rsa_private_key = encryption.generate_rsa_keys()
+        public_key_bytes = self.rsa_public_key.save_pkcs1(format='PEM')
         bio = io.BytesIO()
         image_quality = 10
 
@@ -52,61 +61,74 @@ class StreamingServer:
             try:
                 # Receive the data from the client
                 data, client_address = self.server_socket.recvfrom(65000)
+                print(f'server {self.port} recieved: {data}')
+
+                if data == b'Hi':
+                    self.__clients.append(client_address)
+                    self.server_socket.sendto(public_key_bytes, client_address)
+                    print(f'server {self.port} public key: {self.rsa_public_key}')
+                    print(f'server {self.port} sent public key: {public_key_bytes}')
+                    aes_keys, client_address = self.server_socket.recvfrom(4096)
+                    print(f"server {self.port} received aes encrypted:{aes_keys}")
+                    aes_keys = encryption.decrypt_rsa(aes_keys, self.rsa_private_key)
+                    aes_keys = pickle.loads(aes_keys)
+                    print(f"server {self.port} received aes dycrypted:{aes_keys}")
+                    cipher = encryption.generate_cipher(aes_keys[0], aes_keys[1])
+                    self.__clients_ciphers[client_address] = cipher
+                    print(f'server {self.port} received cipher: {cipher}')
+                    continue
+
+                if self.__clients_amount >= self.__max_clients:
+                    # keep the server going and closing only the 5th client
+                    continue
+
+                if client_address not in self.__clients_screenshots and (not data == b'Hi'):
+                    x_cords, y_cords = self.cords[self.__clients_amount]
+                    self.__clients_screenshots[client_address] = (x_cords, y_cords)
+                    self.__clients_amount += 1
+                    if client_address not in self.__clients:
+                        self.__clients.append(client_address)
+                    # print("ezezezezezezezez")
+
+                if data == encryption.decrypt_AES(b'Q', self.__clients_ciphers[client_address]):
+                    new_screen = self.update_big_screenshot(client_address, self.reset_screenshot)
+                    print(self.__clients_screenshots[client_address])
+                    del self.__clients_screenshots[client_address]
+                    self.__clients_amount -= 1
+                    self.__clients.remove(client_address)
+
+                else:
+
+                    print("hello")
+                    if client_address in self.__clients_ciphers:
+                        data = encryption.decrypt_AES(data, self.__clients_ciphers[client_address])
+                    # Open the screenshot with BytesIO
+                    screenshot = Image.open(BytesIO(data))
+                    print("update big screenshot")
+                    # Updating the screen
+                    new_screen = self.update_big_screenshot(client_address, screenshot)
+
+                # Saving the photo to the digital storage
+                new_screen.save(bio, "JPEG", quality=image_quality)
+                bio.seek(0)
+
+                # Getting the bytes of the photo
+                new_screen = bio.getvalue()
+
+                # Restarting the storage
+                bio.truncate(0)
+
+                length = len(new_screen)
+                if length < 65000:
+                    # Send back the screenshot
+                    self.broadcast(new_screen)
+                    if image_quality < 90 and length < 65000:
+                        image_quality += 5
+                else:
+                    image_quality -= 10
+
             except:
                 continue
-
-            if data == b'Hi':
-                self.__clients.append(client_address)
-                #print("wdwdwdwdwdwdwdwdwdwdwdwdwd")
-                continue
-
-            if self.__clients_amount >= self.__max_clients:
-                self.server_socket.sendto(str(len("max capacity")).encode(), client_address)
-                self.server_socket.sendto("max capacity".encode(), client_address)
-                # keep the server going and closing only the 5th client
-
-            if client_address not in self.__clients_screenshots and (not data == b'Hi'):
-                x_cords, y_cords = self.cords[self.__clients_amount]
-                self.__clients_screenshots[client_address] = (x_cords, y_cords)
-                self.__clients_amount += 1
-                if client_address not in self.__clients:
-                    self.__clients.append(client_address)
-                #print("ezezezezezezezez")
-
-            if data == b'Q':
-                new_screen = self.update_big_screenshot(client_address, self.reset_screenshot)
-                print(self.__clients_screenshots[client_address])
-                del self.__clients_screenshots[client_address]
-                self.__clients_amount -= 1
-                self.__clients.remove(client_address)
-
-
-
-            else:
-                # Open the screenshot with BytesIO
-                screenshot = Image.open(BytesIO(data))
-
-                # Updating the screen
-                new_screen = self.update_big_screenshot(client_address, screenshot)
-
-            # Saving the photo to the digital storage
-            new_screen.save(bio, "JPEG", quality=image_quality)
-            bio.seek(0)
-
-            # Getting the bytes of the photo
-            new_screen = bio.getvalue()
-
-            # Restarting the storage
-            bio.truncate(0)
-
-            length = len(new_screen)
-            if length < 65000:
-                # Send back the screenshot
-                self.broadcast(new_screen)
-                if image_quality < 90 and length < 65000:
-                    image_quality += 5
-            else:
-                image_quality -= 10
 
     def start(self):
         t = threading.Thread(target=self.handle_data)
@@ -195,7 +217,7 @@ class ZoomHostChatWindow:
         print(self.server_address)
         while True:
             client, address = self.sock.accept()
-            #print(f"Connected with {str(adress)}!")
+            # print(f"Connected with {str(adress)}!")
 
             client.send("NICKNAME".encode('utf-8'))
             nickname = client.recv(1024).decode()
