@@ -44,4 +44,4 @@ def decrypt_AES(ciphertext, key, iv):
 
 
 def encrypt_MD5(data):
-    return hashlib.md5(data).hexdigest()
+    return hashlib.md5(data.encode()).hexdigest()
