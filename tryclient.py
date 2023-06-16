@@ -325,7 +325,7 @@ class MicrophoneAudioClient(AudioClient):
         return self.stream.read(self._chunk)
 
 
-class ChatWindow():
+class ChatWindow:
     def __init__(self, client_name, address, input_area, text_area):
         self._CLIENT_NAME = client_name
         self.input_area = input_area
