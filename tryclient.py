@@ -1,3 +1,4 @@
+import pickle
 import socket
 import sys
 import threading
@@ -10,8 +11,8 @@ import io
 import time
 from pynput.mouse import Controller
 from abc import ABC
+
 import encryption
-import pickle
 
 
 class Client(ABC):
@@ -29,7 +30,9 @@ class Client(ABC):
 
     def send_message(self, data):
         """Gets encoded data to send"""
+        print(data)
         self.server_socket.sendto(data, self.server_address)
+        return
 
     def exit_window(self):
         sys.exit()
@@ -46,9 +49,7 @@ class StreamingClient(Client):
         self.server_socket = None
         self.window = None
         self.func = None
-        self.aes_key = None
-        self.aes_iv = None
-        self.cipher = None
+        self.aes_key_iv = None
         self.rsa_public_key = None
         self.font = ImageFont.truetype("arial.ttf", 36)
         self.font_color = (255, 255, 255)
@@ -68,48 +69,40 @@ class StreamingClient(Client):
     def send_screenshot(self):
         """Function to send the screenshot"""
 
+        self.aes_key_iv = encryption.create_AES_key_iv()
         previous_screenshot = None
         bio = io.BytesIO()
         image_quality = 10
-        self.aes_key, self.aes_iv = encryption.create_AES_key_iv()
-        self.cipher = encryption.generate_cipher(self.aes_key, self.aes_iv)
-        print('cipher generated client')
-        # Send start message (or private key)
+
         self.send_message("Hi".encode())
         rsa_public_key_bytes, server_address = self.server_socket.recvfrom(4096)
-        print(f"client {self.port} got from server the key: {rsa_public_key_bytes}")
         self.rsa_public_key = rsa.PublicKey.load_pkcs1(rsa_public_key_bytes, format='PEM')
-        print(f'client {self.port} received rsa key : {self.rsa_public_key}')
-        keys = (self.aes_key, self.aes_iv)
-        print(f'client {self.port} sent aes dycrypted: {keys}')
-        keys = pickle.dumps(keys)
+        keys = pickle.dumps(self.aes_key_iv)
         encrypted_keys = encryption.encrypt_rsa(keys, self.rsa_public_key)
         self.send_message(encrypted_keys)
-        print(f'client {self.port} sent aes encrypted: {encrypted_keys}')
+
 
         while True:
-            print()
+            print(f"")
             if self.__stream_on:
                 # Take a screenshot of the monitor or the camera
                 screenshot = self.get_frame()
                 if previous_screenshot == screenshot:
                     continue
+
                 # Saving the photo to the digital storage
                 screenshot.save(bio, "JPEG", quality=image_quality)
                 bio.seek(0)
 
                 # Getting the bytes of the photo
                 screenshot = bio.getvalue()
-
+                screenshot = encryption.encrypt_AES(screenshot, self.aes_key_iv[0], self.aes_key_iv[1])
                 # Restarting the storage
                 bio.truncate(0)
 
                 length = len(screenshot)
                 if length < 65000:
                     # Sending the screenshot
-                    screenshot = encryption.encrypt_AES(screenshot, self.cipher)
-                    print(len(screenshot))
-                    print(f'client {self.port} sent: {screenshot}')
                     self.send_message(screenshot)
                     if image_quality < 90 and length < 65000:
                         image_quality += 5
@@ -125,8 +118,7 @@ class StreamingClient(Client):
             try:
                 # Receive the screenshot from the server
                 screenshot_bytes, server_address = self.server_socket.recvfrom(65000)
-                print(f'client {self.port} recv: {screenshot_bytes}')
-                screenshot_bytes = encryption.decrypt_AES(screenshot_bytes, self.cipher)
+                screenshot_bytes = encryption.decrypt_AES(screenshot_bytes, self.aes_key_iv[0], self.aes_key_iv[1])
 
                 # Create a PhotoImage object from the received data
                 screenshot = Image.open(BytesIO(screenshot_bytes))
@@ -164,14 +156,14 @@ class StreamingClient(Client):
 
     def stop_stream(self):
         self.__stream_on = False
-        self.send_message(encryption.encrypt_AES("Q".encode(), self.cipher))
+        self.send_message("Q".encode())
         return
 
     def get_frame(self):
         pass
 
     def confirm_close(self):
-        self.send_message(encryption.encrypt_AES("Q".encode(), self.cipher))
+        self.send_message("Q".encode())
         self.__stream_on = False
         self.server_socket.close()
         sys.exit()
@@ -285,7 +277,7 @@ class AudioClient(Client):
     def send_data(self):
         # Loop forever and send audio data to the server
         while True:
-            print()
+            print(f"")
             if not self.__muted:
                 # Read a chunk of audio data from the microphone
                 data = self.get_audio_data()
@@ -359,6 +351,6 @@ class ChatWindow:
             except ConnectionAbortedError:
                 break
             except:
-                print("Error11123123")
+                print("Error")
                 self.sock.close()
                 break
