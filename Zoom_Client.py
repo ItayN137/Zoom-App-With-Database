@@ -8,7 +8,6 @@ import sys
 import threading
 import tryclient
 import tryserver
-from customtkinter import CTkScrollbar
 
 
 class ZoomClient:
@@ -177,10 +176,10 @@ class ZoomClient:
 
         self.chat_client = tryclient.ChatWindow(self._USERNAME, self._IP, self.input_area, self.text_area)
 
-        self.chat_client.start()
         self.audio_client.start()
         self.screen_share_client.start(self.screen_display_label)
         self.camera_client.start(self.camera_display_label)
+        self.chat_client.start()
 
         self.root.protocol("WM_DELETE_WINDOW", self.confirm_close)
         self.root.mainloop()
@@ -275,7 +274,7 @@ class ZoomClient:
         if not self.input_area.get('1.0', 'end-1c') == "":
             data = f"{self._USERNAME}: {self.input_area.get('1.0', 'end')}"
             self.input_area.delete('1.0', 'end')
-        self.chat_client.send_data(data)
+            self.chat_client.send_data(data)
 
 
 class HostZoomClient(ZoomClient):
