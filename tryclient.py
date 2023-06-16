@@ -72,6 +72,7 @@ class StreamingClient(Client):
         while True:
             print(f"")
             if self.__stream_on:
+                time.sleep(1/30)
                 # Take a screenshot of the monitor or the camera
                 screenshot = self.get_frame()
                 if previous_screenshot == screenshot:
@@ -142,6 +143,9 @@ class StreamingClient(Client):
 
     def stop_stream(self):
         self.__stream_on = False
+        self.send_message("Q".encode())
+        self.send_message("Q".encode())
+        self.send_message("Q".encode())
         self.send_message("Q".encode())
         return
 
