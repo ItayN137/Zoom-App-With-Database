@@ -44,9 +44,10 @@ class StreamingServer:
             return self.big_screenshot
 
     def broadcast(self, data):
-        for client_address in self.__clients:
+        for client_address in self.__clients_screenshots:
             data = encryption.encrypt_AES(data, self.__clients_ciphers[client_address][0], self.__clients_ciphers[client_address][1])
             self.server_socket.sendto(data, client_address)
+            print(client_address)
 
     def handle_data(self):
         """Function to handle the data from client connection and send it back"""
@@ -69,7 +70,6 @@ class StreamingServer:
                 aes_tuple = encryption.decrypt_rsa(aes_tuple, self.rsa_private_key)
                 aes_tuple = pickle.loads(aes_tuple)
                 self.__clients_ciphers[client_address] = aes_tuple
-                print(aes_tuple)
                 self.__clients.append(client_address)
                 continue
 
@@ -90,7 +90,6 @@ class StreamingServer:
                 print(self.__clients_screenshots[client_address])
                 del self.__clients_screenshots[client_address]
                 self.__clients_amount -= 1
-                self.__clients.remove(client_address)
 
             else:
                 data = encryption.decrypt_AES(data, self.__clients_ciphers[client_address][0], self.__clients_ciphers[client_address][1])
@@ -152,7 +151,7 @@ class AudioServer:
         self.__clients_addresses = []
         self.__clients_ciphers = {}
         self.__clients_amount = 0
-        self.rsa_public_key= None
+        self.rsa_public_key = None
         self.rsa_private_key = None
 
         # Bind the socket to a specific host and port
@@ -165,8 +164,8 @@ class AudioServer:
 
     def broadcast(self, data, address):
         for client_address in self.__clients_addresses:
-            if client_address == address:
-                continue
+            #if client_address == address:
+                #continue
             data = encryption.encrypt_AES(data, self.__clients_ciphers[client_address][0], self.__clients_ciphers[client_address][1])
             self.server_socket.sendto(data, client_address)
 
