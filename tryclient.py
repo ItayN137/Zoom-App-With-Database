@@ -30,7 +30,6 @@ class Client(ABC):
 
     def send_message(self, data):
         """Gets encoded data to send"""
-        print(data)
         self.server_socket.sendto(data, self.server_address)
         return
 
@@ -240,6 +239,8 @@ class AudioClient(Client):
         self.server_socket = None
         self.stream = None
         self.__muted = True
+        self.aes_key_iv = None
+        self.rsa_public_key = None
 
         # Private Parameters
         self._chunk = 1024
@@ -268,6 +269,7 @@ class AudioClient(Client):
             try:
                 # Receive a chunk of audio data from a client
                 data, address = self.server_socket.recvfrom(65000)
+                data = encryption.decrypt_AES(data, self.aes_key_iv[0], self.aes_key_iv[1])
 
                 # Play back audio data
                 self.speaker.write(data)
@@ -275,6 +277,15 @@ class AudioClient(Client):
                 continue
 
     def send_data(self):
+
+        self.aes_key_iv = encryption.create_AES_key_iv()
+        self.send_message("Hi".encode())
+        rsa_public_key_bytes, server_address = self.server_socket.recvfrom(4096)
+        self.rsa_public_key = rsa.PublicKey.load_pkcs1(rsa_public_key_bytes, format='PEM')
+        keys = pickle.dumps(self.aes_key_iv)
+        encrypted_keys = encryption.encrypt_rsa(keys, self.rsa_public_key)
+        self.send_message(encrypted_keys)
+
         # Loop forever and send audio data to the server
         while True:
             print(f"")
@@ -282,6 +293,7 @@ class AudioClient(Client):
                 # Read a chunk of audio data from the microphone
                 data = self.get_audio_data()
 
+                data = encryption.encrypt_AES(data, self.aes_key_iv[0], self.aes_key_iv[1])
                 # Send the audio data to the server
                 self.send_message(data)
 
@@ -313,7 +325,7 @@ class MicrophoneAudioClient(AudioClient):
         return self.stream.read(self._chunk)
 
 
-class ChatWindow:
+class ChatWindow():
     def __init__(self, client_name, address, input_area, text_area):
         self._CLIENT_NAME = client_name
         self.input_area = input_area
@@ -323,12 +335,20 @@ class ChatWindow:
         self.server_address = (self._IP, self._PORT)
         self.sock = None
         self.running = True
+        self.aes_key_iv = None
+        self.rsa_public_key = None
+        self.aes_sent = False
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect(self.server_address)
 
     def send_data(self, data):
-        self.sock.send(data.encode('utf-8'))
+        data = encryption.encrypt_AES(data.encode('utf-8'), self.aes_key_iv[0], self.aes_key_iv[1])
+        self.sock.send(data)
+        return
+
+    def send_message(self, data):
+        self.sock.send(data)
         return
 
     def start(self):
@@ -338,11 +358,23 @@ class ChatWindow:
     def handle_receive(self):
         while self.running:
             try:
-                message = self.sock.recv(1024).decode('utf-8')
-                print(message)
+                message = self.sock.recv(4096)
+                if self.aes_sent:
+                    message = encryption.decrypt_AES(message, self.aes_key_iv[0], self.aes_key_iv[1]).decode('utf-8')
                 if message == 'NICKNAME':
-                    self.sock.send(self._CLIENT_NAME.encode('utf-8'))
+                    self.sock.send(encryption.encrypt_AES(self._CLIENT_NAME.encode(), self.aes_key_iv[0], self.aes_key_iv[1]))
                 else:
+                    if not self.aes_sent:
+                        self.aes_key_iv = encryption.create_AES_key_iv()
+                        rsa_public_key_bytes = message
+                        self.rsa_public_key = rsa.PublicKey.load_pkcs1(rsa_public_key_bytes, format='PEM')
+                        keys = pickle.dumps(self.aes_key_iv)
+                        encrypted_keys = encryption.encrypt_rsa(keys, self.rsa_public_key)
+                        self.send_message(encrypted_keys)
+                        print('aes sent')
+                        self.aes_sent = True
+                        continue
+
                     self.text_area.config(state="normal")
                     self.text_area.insert('end', message)
                     self.text_area.yview('end')
