@@ -42,14 +42,10 @@ class StreamingClient(Client):
     def __init__(self, name, ip_address):
         super().__init__(name, ip_address)
         self.__stream_on = False
-        self.root = None
-        self.app_image = None
-        self.label = None
         self.server_socket = None
-        self.window = None
-        self.func = None
         self.aes_key_iv = None
         self.rsa_public_key = None
+        self.label = None
         self.font = ImageFont.truetype("arial.ttf", 36)
         self.font_color = (255, 255, 255)
         self.text_pos = (5, 3)
@@ -79,7 +75,6 @@ class StreamingClient(Client):
         keys = pickle.dumps(self.aes_key_iv)
         encrypted_keys = encryption.encrypt_rsa(keys, self.rsa_public_key)
         self.send_message(encrypted_keys)
-
 
         while True:
             print(f"")
