@@ -165,8 +165,8 @@ class AudioServer:
 
     def broadcast(self, data, address):
         for client_address in self.__clients_addresses:
-            #if client_address == address:
-                #continue
+            if client_address == address:
+                continue
             data = encryption.encrypt_AES(data, self.__clients_ciphers[client_address][0], self.__clients_ciphers[client_address][1])
             self.server_socket.sendto(data, client_address)
 
