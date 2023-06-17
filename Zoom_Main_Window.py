@@ -3,11 +3,11 @@ import threading
 from tkinter.messagebox import askyesno
 import sqlite3
 import customtkinter
-from PIL import Image, ImageTk
 import tkinter
 import socket
-import Zoom_Client
+import encryption
 from Zoom_Client import ZoomClient, HostZoomClient
+import multiprocessing
 
 
 class Zoom_Main_Window:
@@ -31,7 +31,7 @@ class Zoom_Main_Window:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.server_address)
 
-        threading.Thread(target=self.handle_zoom_window).start()
+        multiprocessing.Process(target=self.handle_zoom_window).start()
 
     def build_connection_to_db(self):
         # Build the database file + the control tool of it
@@ -114,8 +114,9 @@ class Zoom_Main_Window:
         return False
 
     def check_db(self, ip, password):
+        encrypted_password = encryption.encrypt_MD5(password)
         db_connection, db_cursor = self.build_connection_to_db()
-        request = f"SELECT password FROM servers WHERE ip='{ip}';{password}"
+        request = f"SELECT password FROM servers WHERE ip='{ip}';{encrypted_password}"
         self.client_socket.sendall(request.encode())
 
         response = self.client_socket.recv(1024).decode()
@@ -123,10 +124,12 @@ class Zoom_Main_Window:
 
     def insert_db(self, ip, password):
         db_connection, db_cursor = self.build_connection_to_db()
-        request = f"INSERT INTO servers (ip, password) VALUES ('{ip}', '{password}')"
+        encrypted_password = encryption.encrypt_MD5(password)
+        request = f"INSERT INTO servers (ip, password) VALUES ('{ip}', '{encrypted_password}')"
         self.client_socket.sendall(request.encode())
 
         response = self.client_socket.recv(1024).decode()
+        print(response)
         return response == "Authentication successful"
 
     def create_top_level(self, text):
