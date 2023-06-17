@@ -14,7 +14,7 @@ class StreamingServer:
         self.__clients_screenshots = {}
         self.__clients = []
         self.__clients_amount = 0
-        self.__max_clients = 0
+        self.__max_clients = 4
         self.big_screenshot = None
         self.reset_screenshot = None
         self.cords = None
@@ -57,30 +57,18 @@ class StreamingServer:
 
             if data == b'Hi':
                 self.__clients.append(client_address)
-                #print("wdwdwdwdwdwdwdwdwdwdwdwdwd")
                 continue
 
-            if self.__clients_amount >= self.__max_clients:
-                self.server_socket.sendto(str(len("max capacity")).encode(), client_address)
-                self.server_socket.sendto("max capacity".encode(), client_address)
-                # keep the server going and closing only the 5th client
-
-            if client_address not in self.__clients_screenshots and (not data == b'Hi'):
+            if client_address not in self.__clients_screenshots and (not data == b'Hi') and\
+                    (not self.__clients_amount >= self.__max_clients):
                 x_cords, y_cords = self.cords[self.__clients_amount]
                 self.__clients_screenshots[client_address] = (x_cords, y_cords)
                 self.__clients_amount += 1
                 if client_address not in self.__clients:
                     self.__clients.append(client_address)
-                #print("ezezezezezezezez")
 
             if data == b'Q':
                 new_screen = self.update_big_screenshot(client_address, self.reset_screenshot)
-                print(self.__clients_screenshots[client_address])
-                del self.__clients_screenshots[client_address]
-                self.__clients_amount -= 1
-                self.__clients.remove(client_address)
-
-
 
             else:
                 # Open the screenshot with BytesIO
@@ -117,8 +105,7 @@ class ScreenStreamingServer(StreamingServer):
 
     def __init__(self):
         super(ScreenStreamingServer, self).__init__(12343)
-        self.cords = [(0, 0)]
-        self.__max_clients = 1
+        self.cords = [(0, 0), (0, 0), (0, 0), (0, 0)]
         self.big_screenshot = Image.new("RGB", (1200, 600), color='black')
         self.reset_screenshot = Image.new("RGB", (1200, 600), color='black')
 
@@ -128,7 +115,6 @@ class CameraStreamingServer(StreamingServer):
     def __init__(self):
         super(CameraStreamingServer, self).__init__(12344)
         self.cords = [(0, 0), (300, 0), (600, 0), (900, 0)]
-        self.__max_clients = 4
         self.big_screenshot = Image.new("RGB", (1200, 200), color='black')
         self.reset_screenshot = Image.new("RGB", (300, 200), color='black')
 
