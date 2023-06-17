@@ -9,6 +9,9 @@ import io
 import time
 from pynput.mouse import Controller
 from abc import ABC
+from rsa.key import PublicKey
+
+import encryption
 
 
 class Client(ABC):
@@ -37,12 +40,9 @@ class StreamingClient(Client):
     def __init__(self, name, ip_address):
         super().__init__(name, ip_address)
         self.__stream_on = False
-        self.root = None
-        self.app_image = None
-        self.label = None
         self.server_socket = None
-        self.window = None
-        self.func = None
+        self.key = b"\xeb\x8d'\xe9\xa1.\x05\x9c\x80]\xce\x073|DC"
+        self.iv = b'\x00\x85\xda\xa3gq\x9aC\xbdL\xd0kV"6\xe7'
         self.font = ImageFont.truetype("arial.ttf", 36)
         self.font_color = (255, 255, 255)
         self.text_pos = (5, 3)
@@ -66,8 +66,7 @@ class StreamingClient(Client):
         image_quality = 10
 
         # Send start message (or private key)
-        self.send_message("Hi".encode())
-
+        self.send_message(encryption.encrypt_AES("Hi".encode(), self.key, self.iv))
 
         while True:
             print(f"")
@@ -84,14 +83,16 @@ class StreamingClient(Client):
 
                 # Getting the bytes of the photo
                 screenshot = bio.getvalue()
-
+                screenshot = encryption.encrypt_AES(screenshot, self.key, self.iv)
                 # Restarting the storage
                 bio.truncate(0)
 
                 length = len(screenshot)
                 if length < 65000:
                     # Sending the screenshot
-                    self.send_message(screenshot)
+                    if self.__stream_on:
+                        self.send_message(screenshot)
+
                     if image_quality < 90 and length < 65000:
                         image_quality += 5
                 else:
@@ -106,6 +107,7 @@ class StreamingClient(Client):
             try:
                 # Receive the screenshot from the server
                 screenshot_bytes, server_address = self.server_socket.recvfrom(65000)
+                screenshot_bytes = encryption.decrypt_AES(screenshot_bytes, self.key, self.iv)
 
                 # Create a PhotoImage object from the received data
                 screenshot = Image.open(BytesIO(screenshot_bytes))
@@ -143,18 +145,18 @@ class StreamingClient(Client):
 
     def stop_stream(self):
         self.__stream_on = False
-        self.send_message("Q".encode())
-        self.send_message("Q".encode())
-        self.send_message("Q".encode())
-        self.send_message("Q".encode())
+        self.send_message(encryption.encrypt_AES("Q".encode(), self.key, self.iv))
+        self.send_message(encryption.encrypt_AES("Q".encode(), self.key, self.iv))
+        self.send_message(encryption.encrypt_AES("Q".encode(), self.key, self.iv))
+        self.send_message(encryption.encrypt_AES("Q".encode(), self.key, self.iv))
         return
 
     def get_frame(self):
         pass
 
     def confirm_close(self):
-        self.send_message("QQ".encode())
         self.__stream_on = False
+        self.send_message(encryption.encrypt_AES("Q".encode(), self.key, self.iv))
         self.server_socket.close()
         sys.exit()
 
