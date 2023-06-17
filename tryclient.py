@@ -68,7 +68,6 @@ class StreamingClient(Client):
         # Send start message (or private key)
         self.send_message("Hi".encode())
 
-
         while True:
             print(f"")
             if self.__stream_on:
@@ -91,7 +90,9 @@ class StreamingClient(Client):
                 length = len(screenshot)
                 if length < 65000:
                     # Sending the screenshot
-                    self.send_message(screenshot)
+                    if self.__stream_on:
+                        self.send_message(screenshot)
+
                     if image_quality < 90 and length < 65000:
                         image_quality += 5
                 else:
