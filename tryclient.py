@@ -31,7 +31,6 @@ class Client(ABC):
     def send_message(self, data):
         """Gets encoded data to send"""
         self.server_socket.sendto(data, self.server_address)
-        return
 
     def exit_window(self):
         sys.exit()
@@ -45,7 +44,6 @@ class StreamingClient(Client):
         self.server_socket = None
         self.aes_key_iv = None
         self.rsa_public_key = None
-        self.label = None
         self.font = ImageFont.truetype("arial.ttf", 36)
         self.font_color = (255, 255, 255)
         self.text_pos = (5, 3)
@@ -69,6 +67,7 @@ class StreamingClient(Client):
         bio = io.BytesIO()
         image_quality = 10
 
+        # Send start message (or private key)
         self.send_message("Hi".encode())
         rsa_public_key_bytes, server_address = self.server_socket.recvfrom(4096)
         self.rsa_public_key = rsa.PublicKey.load_pkcs1(rsa_public_key_bytes, format='PEM')
@@ -79,6 +78,7 @@ class StreamingClient(Client):
         while True:
             print(f"")
             if self.__stream_on:
+                time.sleep(1 / 30)
                 # Take a screenshot of the monitor or the camera
                 screenshot = self.get_frame()
                 if previous_screenshot == screenshot:
@@ -90,7 +90,9 @@ class StreamingClient(Client):
 
                 # Getting the bytes of the photo
                 screenshot = bio.getvalue()
-                screenshot = encryption.encrypt_AES(screenshot, self.aes_key_iv[0], self.aes_key_iv[1])
+                screenshot = encryption.encrypt_AES(screenshot, self.aes_key_iv[0],
+                                                    self.aes_key_iv[1])
+
                 # Restarting the storage
                 bio.truncate(0)
 
@@ -112,7 +114,8 @@ class StreamingClient(Client):
             try:
                 # Receive the screenshot from the server
                 screenshot_bytes, server_address = self.server_socket.recvfrom(65000)
-                screenshot_bytes = encryption.decrypt_AES(screenshot_bytes, self.aes_key_iv[0], self.aes_key_iv[1])
+                screenshot_bytes = encryption.decrypt_AES(screenshot_bytes, self.aes_key_iv[0],
+                                                          self.aes_key_iv[1])
 
                 # Create a PhotoImage object from the received data
                 screenshot = Image.open(BytesIO(screenshot_bytes))
@@ -150,6 +153,9 @@ class StreamingClient(Client):
 
     def stop_stream(self):
         self.__stream_on = False
+        self.send_message("Q".encode())
+        self.send_message("Q".encode())
+        self.send_message("Q".encode())
         self.send_message("Q".encode())
         return
 
@@ -234,8 +240,6 @@ class AudioClient(Client):
         self.server_socket = None
         self.stream = None
         self.__muted = True
-        self.aes_key_iv = None
-        self.rsa_public_key = None
 
         # Private Parameters
         self._chunk = 1024
@@ -264,7 +268,6 @@ class AudioClient(Client):
             try:
                 # Receive a chunk of audio data from a client
                 data, address = self.server_socket.recvfrom(65000)
-                data = encryption.decrypt_AES(data, self.aes_key_iv[0], self.aes_key_iv[1])
 
                 # Play back audio data
                 self.speaker.write(data)
@@ -272,15 +275,6 @@ class AudioClient(Client):
                 continue
 
     def send_data(self):
-
-        self.aes_key_iv = encryption.create_AES_key_iv()
-        self.send_message("Hi".encode())
-        rsa_public_key_bytes, server_address = self.server_socket.recvfrom(4096)
-        self.rsa_public_key = rsa.PublicKey.load_pkcs1(rsa_public_key_bytes, format='PEM')
-        keys = pickle.dumps(self.aes_key_iv)
-        encrypted_keys = encryption.encrypt_rsa(keys, self.rsa_public_key)
-        self.send_message(encrypted_keys)
-
         # Loop forever and send audio data to the server
         while True:
             print(f"")
@@ -288,7 +282,6 @@ class AudioClient(Client):
                 # Read a chunk of audio data from the microphone
                 data = self.get_audio_data()
 
-                data = encryption.encrypt_AES(data, self.aes_key_iv[0], self.aes_key_iv[1])
                 # Send the audio data to the server
                 self.send_message(data)
 
@@ -330,20 +323,12 @@ class ChatWindow:
         self.server_address = (self._IP, self._PORT)
         self.sock = None
         self.running = True
-        self.aes_key_iv = None
-        self.rsa_public_key = None
-        self.aes_sent = False
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect(self.server_address)
 
     def send_data(self, data):
-        data = encryption.encrypt_AES(data.encode('utf-8'), self.aes_key_iv[0], self.aes_key_iv[1])
-        self.sock.send(data)
-        return
-
-    def send_message(self, data):
-        self.sock.send(data)
+        self.sock.send(data.encode('utf-8'))
         return
 
     def start(self):
@@ -353,23 +338,11 @@ class ChatWindow:
     def handle_receive(self):
         while self.running:
             try:
-                message = self.sock.recv(4096)
-                if self.aes_sent:
-                    message = encryption.decrypt_AES(message, self.aes_key_iv[0], self.aes_key_iv[1]).decode('utf-8')
+                message = self.sock.recv(1024).decode('utf-8')
+                print(message)
                 if message == 'NICKNAME':
-                    self.sock.send(encryption.encrypt_AES(self._CLIENT_NAME.encode(), self.aes_key_iv[0], self.aes_key_iv[1]))
+                    self.sock.send(self._CLIENT_NAME.encode('utf-8'))
                 else:
-                    if not self.aes_sent:
-                        self.aes_key_iv = encryption.create_AES_key_iv()
-                        rsa_public_key_bytes = message
-                        self.rsa_public_key = rsa.PublicKey.load_pkcs1(rsa_public_key_bytes, format='PEM')
-                        keys = pickle.dumps(self.aes_key_iv)
-                        encrypted_keys = encryption.encrypt_rsa(keys, self.rsa_public_key)
-                        self.send_message(encrypted_keys)
-                        print('aes sent')
-                        self.aes_sent = True
-                        continue
-
                     self.text_area.config(state="normal")
                     self.text_area.insert('end', message)
                     self.text_area.yview('end')
