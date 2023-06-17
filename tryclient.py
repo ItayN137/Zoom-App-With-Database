@@ -163,8 +163,8 @@ class StreamingClient(Client):
         pass
 
     def confirm_close(self):
-        self.send_message("Q".encode())
         self.__stream_on = False
+        self.send_message("Q".encode())
         self.server_socket.close()
         sys.exit()
 
