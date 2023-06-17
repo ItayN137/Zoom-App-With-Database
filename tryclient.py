@@ -5,7 +5,6 @@ import threading
 from io import BytesIO
 import cv2
 import pyaudio
-import rsa
 from PIL import ImageGrab, Image, ImageTk, JpegImagePlugin, ImageDraw, ImageFont
 import io
 import time
@@ -41,9 +40,13 @@ class StreamingClient(Client):
     def __init__(self, name, ip_address):
         super().__init__(name, ip_address)
         self.__stream_on = False
+        self.root = None
+        self.app_image = None
+        self.label = None
         self.server_socket = None
+        self.window = None
+        self.func = None
         self.aes_key_iv = None
-        self.rsa_public_key = None
         self.font = ImageFont.truetype("arial.ttf", 36)
         self.font_color = (255, 255, 255)
         self.text_pos = (5, 3)
@@ -63,17 +66,14 @@ class StreamingClient(Client):
         """Function to send the screenshot"""
 
         self.aes_key_iv = encryption.create_AES_key_iv()
+        keys_bytes = pickle.dumps(self.aes_key_iv)
         previous_screenshot = None
         bio = io.BytesIO()
         image_quality = 10
 
         # Send start message (or private key)
-        self.send_message("Hi".encode())
-        rsa_public_key_bytes, server_address = self.server_socket.recvfrom(4096)
-        self.rsa_public_key = rsa.PublicKey.load_pkcs1(rsa_public_key_bytes, format='PEM')
-        keys = pickle.dumps(self.aes_key_iv)
-        encrypted_keys = encryption.encrypt_rsa(keys, self.rsa_public_key)
-        self.send_message(encrypted_keys)
+        self.send_message(b"Hi:" + keys_bytes)
+        print(self.aes_key_iv)
 
         while True:
             print(f"")
@@ -92,14 +92,15 @@ class StreamingClient(Client):
                 screenshot = bio.getvalue()
                 screenshot = encryption.encrypt_AES(screenshot, self.aes_key_iv[0],
                                                     self.aes_key_iv[1])
-
                 # Restarting the storage
                 bio.truncate(0)
 
                 length = len(screenshot)
                 if length < 65000:
                     # Sending the screenshot
-                    self.send_message(screenshot)
+                    if self.__stream_on:
+                        self.send_message(screenshot)
+
                     if image_quality < 90 and length < 65000:
                         image_quality += 5
                 else:
@@ -163,8 +164,8 @@ class StreamingClient(Client):
         pass
 
     def confirm_close(self):
-        self.__stream_on = False
         self.send_message("Q".encode())
+        self.__stream_on = False
         self.server_socket.close()
         sys.exit()
 
