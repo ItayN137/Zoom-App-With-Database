@@ -175,6 +175,8 @@ class ZoomHostChatWindow:
         self.clients = []
         self.nicknames = []
         self.sock = None
+        self.key = b"\xeb\x8d'\xe9\xa1.\x05\x9c\x80]\xce\x073|DC"
+        self.iv = b'\x00\x85\xda\xa3gq\x9aC\xbdL\xd0kV"6\xe7'
 
     def handle_receive(self):
 
@@ -186,14 +188,17 @@ class ZoomHostChatWindow:
         while True:
             client, address = self.sock.accept()
 
-            client.send("NICKNAME".encode('utf-8'))
-            nickname = client.recv(1024).decode()
+            nick_msg = encryption.encrypt_AES("NICKNAME".encode('utf-8'), self.key, self.iv)
+            client.send(nick_msg)
+            nickname = client.recv(1024)
+            nickname = encryption.decrypt_AES(nickname, self.key, self.iv).decode()
 
             self.nicknames.append(nickname)
             self.clients.append(client)
 
-            print(f"Name of client:{nickname}")
-            self.broadcast(f"{nickname} connected to server!\n".encode('utf-8'))
+            brd_msg = encryption.encrypt_AES(f"{nickname} connected to server!\n".encode('utf-8'),
+                                             self.key, self.iv)
+            self.broadcast(brd_msg)
 
             thread = threading.Thread(target=self.handle_message, args=(client,))
             thread.start()
@@ -211,6 +216,9 @@ class ZoomHostChatWindow:
             except:
                 index = self.clients.index(client)
                 self.clients.remove(client)
+                brd_msg = encryption.encrypt_AES(f"{self.nicknames[index]} disconnected to server!\n".encode('utf-8'),
+                                                 self.key, self.iv)
+                self.broadcast(brd_msg)
                 client.close()
                 self.nicknames.remove(self.nicknames[index])
                 break
