@@ -21,6 +21,8 @@ class Client(ABC):
         self.port = None
         self.server_address = None
         self.name = name
+        self.key = b"\xeb\x8d'\xe9\xa1.\x05\x9c\x80]\xce\x073|DC"
+        self.iv = b'\x00\x85\xda\xa3gq\x9aC\xbdL\xd0kV"6\xe7'
 
     def connect_udp_socket(self):
         # Open a socket
@@ -41,8 +43,7 @@ class StreamingClient(Client):
         super().__init__(name, ip_address)
         self.__stream_on = False
         self.server_socket = None
-        self.key = b"\xeb\x8d'\xe9\xa1.\x05\x9c\x80]\xce\x073|DC"
-        self.iv = b'\x00\x85\xda\xa3gq\x9aC\xbdL\xd0kV"6\xe7'
+
         self.font = ImageFont.truetype("arial.ttf", 36)
         self.font_color = (255, 255, 255)
         self.text_pos = (5, 3)
@@ -260,6 +261,7 @@ class AudioClient(Client):
             try:
                 # Receive a chunk of audio data from a client
                 data, address = self.server_socket.recvfrom(65000)
+                data = encryption.decrypt_AES(data, self.key, self.iv)
 
                 # Play back audio data
                 self.speaker.write(data)
@@ -273,6 +275,7 @@ class AudioClient(Client):
             if not self.__muted:
                 # Read a chunk of audio data from the microphone
                 data = self.get_audio_data()
+                data = encryption.encrypt_AES(data, self.key, self.iv)
 
                 # Send the audio data to the server
                 self.send_message(data)
