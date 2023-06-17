@@ -1,7 +1,6 @@
 import socket
 import sqlite3
 import threading
-from sqlite3 import Error
 
 
 class Database_Server:
@@ -21,21 +20,24 @@ class Database_Server:
     def handle_request(self, client_socket, request):
         response = None
         try:
-            request_clear = request.split(";")
-            print(request_clear)
             db_connection, db_cursor = self.build_connection_to_db()
-            db_cursor.execute(request_clear[0])
-            print("outside the if statements")
-            if request_clear[0].lower().startswith("select"):
+            #print("outside the if statements")
+            if request.lower().startswith("select"):
+                request_clear = request.split(";")
+                db_cursor.execute(request_clear[0])
                 result = db_cursor.fetchall()
-                stored_password = result[0]
-                print(stored_password)
+                print(f"result: {result}")
+                stored_password = result[0][0]
+                print(f"password found: {stored_password}")
+                print(f"request password: {request_clear[1]}")
                 if stored_password == request_clear[1]:
                     response = f"Authentication successful"
                 else:
                     response = "Exception"
-            elif request_clear[0].lower().startswith("insert"):
+            elif request.lower().startswith("insert"):
                 try:
+                    print(request)
+                    db_cursor.execute(request)
                     print("hi")
                     db_connection.commit()
                     response = "Authentication successful"
@@ -43,7 +45,7 @@ class Database_Server:
                     response = "Exception1"
         except:
             response = "Exception2"
-        print(response)
+        #print(response)
         client_socket.sendall(response.encode())
         return
 
