@@ -3,6 +3,8 @@ import threading
 from PIL import Image
 from io import BytesIO
 import io
+import rsa.pem
+import encryption
 
 
 class StreamingServer:
@@ -14,10 +16,12 @@ class StreamingServer:
         self.__clients_screenshots = {}
         self.__clients = []
         self.__clients_amount = 0
-        self.__max_clients = 0
+        self.__max_clients = 4
         self.big_screenshot = None
         self.reset_screenshot = None
         self.cords = None
+        self.key = b"\xeb\x8d'\xe9\xa1.\x05\x9c\x80]\xce\x073|DC"
+        self.iv = b'\x00\x85\xda\xa3gq\x9aC\xbdL\xd0kV"6\xe7'
 
         # Bind the socket to a specific host and port
         self.host = socket.gethostname()
@@ -40,7 +44,6 @@ class StreamingServer:
     def broadcast(self, data):
         for client_address in self.__clients:
             self.server_socket.sendto(data, client_address)
-            print("lolololololll")
 
     def handle_data(self):
         """Function to handle the data from client connection and send it back"""
@@ -52,35 +55,24 @@ class StreamingServer:
             try:
                 # Receive the data from the client
                 data, client_address = self.server_socket.recvfrom(65000)
+                data = encryption.decrypt_AES(data, self.key, self.iv)
             except:
                 continue
 
             if data == b'Hi':
                 self.__clients.append(client_address)
-                #print("wdwdwdwdwdwdwdwdwdwdwdwdwd")
                 continue
 
-            if self.__clients_amount >= self.__max_clients:
-                self.server_socket.sendto(str(len("max capacity")).encode(), client_address)
-                self.server_socket.sendto("max capacity".encode(), client_address)
-                # keep the server going and closing only the 5th client
-
-            if client_address not in self.__clients_screenshots and (not data == b'Hi'):
+            if client_address not in self.__clients_screenshots and (not data == b'Hi') and\
+                    (not self.__clients_amount >= self.__max_clients):
                 x_cords, y_cords = self.cords[self.__clients_amount]
                 self.__clients_screenshots[client_address] = (x_cords, y_cords)
                 self.__clients_amount += 1
                 if client_address not in self.__clients:
                     self.__clients.append(client_address)
-                #print("ezezezezezezezez")
 
             if data == b'Q':
                 new_screen = self.update_big_screenshot(client_address, self.reset_screenshot)
-                print(self.__clients_screenshots[client_address])
-                del self.__clients_screenshots[client_address]
-                self.__clients_amount -= 1
-                self.__clients.remove(client_address)
-
-
 
             else:
                 # Open the screenshot with BytesIO
@@ -95,7 +87,7 @@ class StreamingServer:
 
             # Getting the bytes of the photo
             new_screen = bio.getvalue()
-
+            new_screen = encryption.encrypt_AES(new_screen, self.key, self.iv)
             # Restarting the storage
             bio.truncate(0)
 
@@ -117,8 +109,7 @@ class ScreenStreamingServer(StreamingServer):
 
     def __init__(self):
         super(ScreenStreamingServer, self).__init__(12343)
-        self.cords = [(0, 0)]
-        self.__max_clients = 1
+        self.cords = [(0, 0), (0, 0), (0, 0), (0, 0)]
         self.big_screenshot = Image.new("RGB", (1200, 600), color='black')
         self.reset_screenshot = Image.new("RGB", (1200, 600), color='black')
 
@@ -128,7 +119,6 @@ class CameraStreamingServer(StreamingServer):
     def __init__(self):
         super(CameraStreamingServer, self).__init__(12344)
         self.cords = [(0, 0), (300, 0), (600, 0), (900, 0)]
-        self.__max_clients = 4
         self.big_screenshot = Image.new("RGB", (1200, 200), color='black')
         self.reset_screenshot = Image.new("RGB", (300, 200), color='black')
 
@@ -195,7 +185,6 @@ class ZoomHostChatWindow:
         print(self.server_address)
         while True:
             client, address = self.sock.accept()
-            #print(f"Connected with {str(adress)}!")
 
             client.send("NICKNAME".encode('utf-8'))
             nickname = client.recv(1024).decode()
