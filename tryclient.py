@@ -318,12 +318,15 @@ class ChatWindow:
         self.server_address = (self._IP, self._PORT)
         self.sock = None
         self.running = True
+        self.key = b"\xeb\x8d'\xe9\xa1.\x05\x9c\x80]\xce\x073|DC"
+        self.iv = b'\x00\x85\xda\xa3gq\x9aC\xbdL\xd0kV"6\xe7'
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect(self.server_address)
 
     def send_data(self, data):
-        self.sock.send(data.encode('utf-8'))
+        msg = encryption.encrypt_AES(data.encode('utf-8'), self.key, self.iv)
+        self.sock.send(msg)
         return
 
     def start(self):
@@ -333,10 +336,13 @@ class ChatWindow:
     def handle_receive(self):
         while self.running:
             try:
-                message = self.sock.recv(1024).decode('utf-8')
+                message = self.sock.recv(1024)
+                message = encryption.decrypt_AES(message, self.key, self.iv).decode('utf-8')
                 print(message)
                 if message == 'NICKNAME':
-                    self.sock.send(self._CLIENT_NAME.encode('utf-8'))
+                    nick_msg = encryption.encrypt_AES(self._CLIENT_NAME.encode('utf-8'),
+                                                      self.key, self.iv)
+                    self.sock.send(nick_msg)
                 else:
                     self.text_area.config(state="normal")
                     self.text_area.insert('end', message)
